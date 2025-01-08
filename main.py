@@ -6,7 +6,7 @@ from comet_ml.integration.sklearn import load_model
 # Initialiser l'application
 app = FastAPI()
 
-model = loaded_model = load_model("registry://n0ku/AI-la-Carte-Random_Forest")
+model = load_model("registry://n0ku/AI-la-Carte-Random_Forest")
 
 # Définir la structure des données entrantes
 class PredictRequest(BaseModel):
