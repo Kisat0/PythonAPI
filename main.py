@@ -1,18 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import joblib
 import numpy as np
-import os
+from comet_ml.integration.sklearn import load_model
 
 # Initialiser l'application
 app = FastAPI()
 
-# Charger le modèle
-MODEL_PATH = "models/restaurant_closures_rf.pkl"
-if not os.path.exists(MODEL_PATH):
-    raise FileNotFoundError(f"Le fichier modèle {MODEL_PATH} est introuvable.")
-
-model = joblib.load(MODEL_PATH)
+model = loaded_model = load_model("registry://n0ku/AI-la-Carte-Random_Forest")
 
 # Définir la structure des données entrantes
 class PredictRequest(BaseModel):
