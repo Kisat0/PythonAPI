@@ -3,6 +3,9 @@ from pydantic import BaseModel
 import numpy as np
 from comet_ml.integration.sklearn import load_model
 from fastapi.middleware.cors import CORSMiddleware
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
 origins = [
     "http://localhost",
@@ -26,6 +29,19 @@ model = load_model("registry://n0ku/AI-la-Carte-Random_Forest")
 class PredictRequest(BaseModel):
     features: list[float]  # Liste des caractéristiques pour la prédiction
 
+# Define the preprocessor used during training
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), ['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG']),
+        ('cat', OneHotEncoder(handle_unknown='ignore'), ['CUISINE DESCRIPTION'])
+    ]
+)
+
+# Define the prediction pipeline
+prediction_pipeline = Pipeline([
+    ('preprocessor', preprocessor),
+    ('classifier', model)
+])
 
 @app.get("/")
 def read_root():
@@ -42,8 +58,8 @@ def predict(request: PredictRequest):
     input_data = np.array(request.features).reshape(1, -1)
 
     try:
-        # Faire la prédiction
-        prediction = model.predict(input_data)
+        # Faire la prédiction en utilisant le pipeline de prédiction
+        prediction = prediction_pipeline.predict(input_data)
         return {"prediction": prediction.tolist()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur de prédiction : {str(e)}")
