@@ -1,11 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import numpy as np
+import pandas as pd
 from comet_ml.integration.sklearn import load_model
 from fastapi.middleware.cors import CORSMiddleware
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
+import logging
+from typing import List
+
+# Initialiser le logger
+logger = logging.getLogger(__name__)
 
 origins = [
     "http://localhost",
@@ -23,43 +26,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = load_model("registry://n0ku/AI-la-Carte-Random_Forest")
+# Load the pre-trained model from Comet
+model = load_model("registry://n0ku/AI-la-Carte-Random_Forest-3.0")
+print("Model loaded successfully:", model)
 
 # Définir la structure des données entrantes
 class PredictRequest(BaseModel):
-    features: list[float]  # Liste des caractéristiques pour la prédiction
+    features: List
 
-# Define the preprocessor used during training
-preprocessor = ColumnTransformer(
-    transformers=[
-        ('num', StandardScaler(), ['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG']),
-        ('cat', OneHotEncoder(handle_unknown='ignore'), ['CUISINE DESCRIPTION'])
-    ]
-)
-
-# Define the prediction pipeline
-prediction_pipeline = Pipeline([
-    ('preprocessor', preprocessor),
-    ('classifier', model)
-])
+# Test the pipeline with sample data
+sample_data = pd.DataFrame([[40.7128, -74.0060, 10, 1, 'Italian']],
+            columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION'])
+try:
+    model.predict(sample_data)
+    print("Pipeline test successful")
+except Exception as e:
+    print("Pipeline test failed:", e)
 
 @app.get("/")
 def read_root():
     return {"message": "API de prédiction des fermetures de restaurants"}
-
 # Route de prédiction
 @app.post("/predict")
 def predict(request: PredictRequest):
-    # Vérifier que les données sont au bon format
-    if not isinstance(request.features, list) or len(request.features) == 0:
-        raise HTTPException(status_code=400, detail="Les 'features' doivent être une liste non vide.")
+    # Log the received features
+    logger.info(f"Received features: {request.features}")
 
-    # Convertir les données en tableau numpy
-    input_data = np.array(request.features).reshape(1, -1)
-
+    # Validate the input features
+    if len(request.features) != 5:
+        raise HTTPException(status_code=422, detail="Invalid number of features. Expected 5.")
+    
     try:
-        # Faire la prédiction en utilisant le pipeline de prédiction
-        prediction = prediction_pipeline.predict(input_data)
+        # Convert the input features to a DataFrame
+        input_data = pd.DataFrame([request.features], columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION'])
+        logger.info(f"Input data reshaped for prediction: {input_data}")
+        
+        # Make predictions
+        prediction = model.predict(input_data)
+        logger.info(f"Prediction result: {prediction}")
         return {"prediction": prediction.tolist()}
+    except ValueError as ve:
+        logger.error(f"ValueError during prediction: {str(ve)}")
+        raise HTTPException(status_code=400, detail=f"ValueError: {str(ve)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur de prédiction : {str(e)}")
+        logger.error(f"Unexpected error during prediction: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
