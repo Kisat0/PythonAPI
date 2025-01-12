@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import numpy as np
 import pandas as pd
 from comet_ml.integration.sklearn import load_model
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,7 +39,7 @@ sample_data = pd.DataFrame([[40.7128, -74.0060, 10, 1, 'Italian']],
 try:
     model.predict(sample_data)
     print("Pipeline test successful")
-except Exception as e:
+except (TypeError, KeyError) as e:
     print("Pipeline test failed:", e)
 
 @app.get("/")
@@ -50,7 +49,7 @@ def read_root():
 @app.post("/predict")
 def predict(request: PredictRequest):
     # Log the received features
-    logger.info(f"Received features: {request.features}")
+    logger.info("Received features: %s", request.features)
 
     # Validate the input features
     if len(request.features) != 5:
@@ -59,15 +58,34 @@ def predict(request: PredictRequest):
     try:
         # Convert the input features to a DataFrame
         input_data = pd.DataFrame([request.features], columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION'])
-        logger.info(f"Input data reshaped for prediction: {input_data}")
+        logger.info("Input data reshaped for prediction: %s", input_data)
         
         # Make predictions
         prediction = model.predict(input_data)
-        logger.info(f"Prediction result: {prediction}")
-        return {"prediction": prediction.tolist()}
+        logger.info("Prediction result: %s", prediction)
+        return {"prediction": prediction.tolist(), "probability": model.predict_proba(input_data).tolist()}
     except ValueError as ve:
-        logger.error(f"ValueError during prediction: {str(ve)}")
-        raise HTTPException(status_code=400, detail=f"ValueError: {str(ve)}")
-    except Exception as e:
-        logger.error(f"Unexpected error during prediction: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+        logger.error("ValueError during prediction: %s", str(ve))
+        raise HTTPException(status_code=400, detail=f"ValueError: {str(ve)}") from ve
+    except (TypeError, KeyError) as e:
+        logger.error("An error occurred during prediction: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"An error occurred during prediction: {str(e)}") from e
+    
+
+# Route de healthcheck du modèle
+@app.get("/healthcheck")
+def healthcheck():
+    # Vérifier que le modèle est bien chargé
+    try:
+        healthcheck_sample_data = pd.DataFrame([[40.7128, -74.0060, 10, 1, 'Italian']],
+                                               columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION'])
+        model.predict(healthcheck_sample_data)
+        model_status = "Model is loaded and working"
+    except (TypeError, KeyError, ValueError) as e:
+        model_status = f"Model loading or prediction failed: {str(e)}"
+    
+    return {
+        "status": "Healthcheck passed",
+        "model_status": model_status,
+    }
+    
