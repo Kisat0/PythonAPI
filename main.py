@@ -89,3 +89,29 @@ def healthcheck():
         "model_status": model_status,
     }
     
+
+# Route de l'explication de la prédiction
+@app.post("/explain")
+def explain(request: PredictRequest):
+    # Log the received features
+    logger.info("Received features for explanation: %s", request.features)
+
+    # Validate the input features
+    if len(request.features) != 5:
+        raise HTTPException(status_code=422, detail="Invalid number of features. Expected 5.")
+    
+    try:
+        # Convert the input features to a DataFrame
+        input_data = pd.DataFrame([request.features], columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION'])
+        logger.info("Input data reshaped for explanation: %s", input_data)
+        
+        # Explain the prediction
+        explanation = model.explain(input_data)
+        logger.info("Explanation result: %s", explanation)
+        return {"explanation": explanation}
+    except ValueError as ve:
+        logger.error("ValueError during explanation: %s", str(ve))
+        raise HTTPException(status_code=400, detail=f"ValueError: {str(ve)}") from ve
+    except (TypeError, KeyError) as e:
+        logger.error("An error occurred during explanation: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"An error occurred during explanation: {str(e)}") from e
