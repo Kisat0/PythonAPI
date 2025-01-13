@@ -26,7 +26,7 @@ app.add_middleware(
 )
 
 # Load the pre-trained model from Comet
-model = load_model("registry://n0ku/AI-la-Carte-Random_Forest-3.0")
+model = load_model("registry://n0ku/AI-la-Carte-Random_ForestV4")
 print("Model loaded successfully:", model)
 
 # Définir la structure des données entrantes
@@ -34,8 +34,8 @@ class PredictRequest(BaseModel):
     features: List
 
 # Test the pipeline with sample data
-sample_data = pd.DataFrame([[40.7128, -74.0060, 10, 1, 'Italian']],
-            columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION'])
+sample_data = pd.DataFrame([[40.7128, -74.0060, 10, 1, 'Italian',0.24434,2014]],
+            columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION','LOCATION_SCORE','INSPECTION DATE'])
 try:
     model.predict(sample_data)
     print("Pipeline test successful")
@@ -45,6 +45,7 @@ except (TypeError, KeyError) as e:
 @app.get("/")
 def read_root():
     return {"message": "API de prédiction des fermetures de restaurants"}
+
 # Route de prédiction
 @app.post("/predict")
 def predict(request: PredictRequest):
@@ -52,12 +53,12 @@ def predict(request: PredictRequest):
     logger.info("Received features: %s", request.features)
 
     # Validate the input features
-    if len(request.features) != 5:
-        raise HTTPException(status_code=422, detail="Invalid number of features. Expected 5.")
+    if len(request.features) != 7:
+        raise HTTPException(status_code=422, detail="Invalid number of features. Expected 7.")
     
     try:
         # Convert the input features to a DataFrame
-        input_data = pd.DataFrame([request.features], columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION'])
+        input_data = pd.DataFrame([request.features], columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION','LOCATION_SCORE','INSPECTION DATE'])
         logger.info("Input data reshaped for prediction: %s", input_data)
         
         # Make predictions
@@ -77,8 +78,8 @@ def predict(request: PredictRequest):
 def healthcheck():
     # Vérifier que le modèle est bien chargé
     try:
-        healthcheck_sample_data = pd.DataFrame([[40.7128, -74.0060, 10, 1, 'Italian']],
-                                               columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION'])
+        healthcheck_sample_data = pd.DataFrame([[40.7128, -74.0060, 10, 1, 'Italian',0.24434,2014]],
+                                               columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION','LOCATION_SCORE','INSPECTION DATE'])
         model.predict(healthcheck_sample_data)
         model_status = "Model is loaded and working"
     except (TypeError, KeyError, ValueError) as e:
@@ -97,12 +98,12 @@ def explain(request: PredictRequest):
     logger.info("Received features for explanation: %s", request.features)
 
     # Validate the input features
-    if len(request.features) != 5:
-        raise HTTPException(status_code=422, detail="Invalid number of features. Expected 5.")
+    if len(request.features) != 7:
+        raise HTTPException(status_code=422, detail="Invalid number of features. Expected 7.")
     
     try:
         # Convert the input features to a DataFrame
-        input_data = pd.DataFrame([request.features], columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION'])
+        input_data = pd.DataFrame([request.features], columns=['LONGITUDE', 'LATITUDE', 'SCORE', 'CRITICAL FLAG', 'CUISINE DESCRIPTION','LOCATION_SCORE','INSPECTION DATE'])
         logger.info("Input data reshaped for explanation: %s", input_data)
         
         # Explain the prediction
