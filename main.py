@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 origins = [
     "http://localhost",
     "http://localhost:5173",
+    "http://localhost:8000",
 ]
 
 # Initialiser l'application
